@@ -73,30 +73,39 @@ class Serial
     end
   end
 
-  def gets(sep = $INPUT_RECORD_SEPARATOR, limit = nil)
+  def gets(sep: "\n", limit: nil)
     if block_given?
       loop do
-        yield(get_until_sep(sep, limit))
+        yield(get_until_sep(sep:, limit:))
       end
     else
-      get_until_sep(sep, limit)
+      get_until_sep(sep:, limit:)
+    end
+  end
+
+  def readline(sep: "\n", limit: nil, timeout: 60)
+    Timeout.timeout(timeout) do
+      gets(sep:, limit:)
     end
   end
 
   private
 
-  def get_until_sep(sep, limit)
-    sep = "\n\n" if sep == ''
-    # This allows the method signature to be (sep) or (limit)
-    if sep.is_a? Integer
-      (limit = sep
-       sep = "\n")
-    end
+  def get_until_sep(sep: nil, limit: nil)
     bytes = []
     loop do
       current_byte = getbyte
       bytes << current_byte unless current_byte.nil?
-      break if (bytes.last(sep.bytes.to_a.size) == sep.bytes.to_a) || ((bytes.size == limit) if limit)
+
+      # Calculate whether we've found the separator
+      separator_size      = sep.bytes.size
+      separator_reached   = (bytes.last(separator_size) == sep.bytes)
+
+      # Check if we have a limit and it’s been reached
+      limit_reached       = limit && (bytes.size == limit)
+
+      # Stop reading if either condition is true
+      break if separator_reached || limit_reached
     end
 
     bytes.map(&:chr).join

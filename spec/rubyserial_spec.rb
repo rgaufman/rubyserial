@@ -107,29 +107,29 @@ describe 'rubyserial' do
     it 'should accept a sep param' do
       @sp.write('no yes END bleh')
       sleep 0.1
-      expect(@sp2.gets('END')).to eql('no yes END')
+      expect(@sp2.gets(sep: 'END')).to eql('no yes END')
     end
 
     it 'should accept a limit param' do
       @sp.write("no yes \n hello")
       sleep 0.1
-      expect(@sp2.gets(4)).to eql('no y')
+      expect(@sp2.gets(limit: 4)).to eql('no y')
     end
 
     it 'should accept limit and sep params' do
       @sp.write('no yes END hello')
       sleep 0.1
-      expect(@sp2.gets('END', 20)).to eql('no yes END')
+      expect(@sp2.gets(sep: 'END', limit: 20)).to eql('no yes END')
       @sp2.read(1000)
       @sp.write('no yes END hello')
       sleep 0.1
-      expect(@sp2.gets('END', 4)).to eql('no y')
+      expect(@sp2.gets(sep: 'END', limit: 4)).to eql('no y')
     end
 
     it 'should read a paragraph at a time' do
       @sp.write("Something \n Something else \n\n and other stuff")
       sleep 0.1
-      expect(@sp2.gets('')).to eql("Something \n Something else \n\n")
+      expect(@sp2.gets(sep: "\n\n")).to eql("Something \n Something else \n\n")
     end
   end
 
