@@ -1,30 +1,29 @@
+# frozen_string_literal: true
+
 # Copyright (c) 2014-2016 The Hybrid Group
 
+require 'English'
 class Serial
-  def initialize(address, baude_rate=9600, data_bits=8, parity=:none, stop_bits=1)
+  def initialize(address, baude_rate = 9600, data_bits = 8, parity = :none, stop_bits = 1)
     file_opts = RubySerial::Win32::GENERIC_READ | RubySerial::Win32::GENERIC_WRITE
-    @fd = RubySerial::Win32.CreateFileA("\\\\.\\#{address}", file_opts, 0, nil, RubySerial::Win32::OPEN_EXISTING, 0, nil)
+    @fd = RubySerial::Win32.CreateFileA("\\\\.\\#{address}", file_opts, 0, nil, RubySerial::Win32::OPEN_EXISTING, 0,
+                                        nil)
     err = FFI.errno
-    if err != 0
-      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[err]
-    else
-      @open = true
-    end
+    raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[err] if err != 0
+
+    @open = true
 
     RubySerial::Win32::DCB.new.tap do |dcb|
       dcb[:dcblength] = RubySerial::Win32::DCB::Sizeof
       err = RubySerial::Win32.GetCommState @fd, dcb
-      if err == 0
-        raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-      end
+      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
+
       dcb[:baudrate] = baude_rate
       dcb[:bytesize] = data_bits
       dcb[:stopbits] = RubySerial::Win32::DCB::STOPBITS[stop_bits]
       dcb[:parity]   = RubySerial::Win32::DCB::PARITY[parity]
       err = RubySerial::Win32.SetCommState @fd, dcb
-      if err == 0
-        raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-      end
+      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
     end
 
     RubySerial::Win32::CommTimeouts.new.tap do |timeouts|
@@ -34,9 +33,7 @@ class Serial
       timeouts[:write_total_timeout_multiplier] = 1
       timeouts[:write_total_timeout_constant]   = 10
       err = RubySerial::Win32.SetCommTimeouts @fd, timeouts
-      if err == 0
-        raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-      end
+      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
     end
   end
 
@@ -44,9 +41,8 @@ class Serial
     buff = FFI::MemoryPointer.new :char, size
     count = FFI::MemoryPointer.new :uint32, 1
     err = RubySerial::Win32.ReadFile(@fd, buff, size, count, nil)
-    if err == 0
-      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-    end
+    raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
+
     buff.get_bytes(0, count.read_int)
   end
 
@@ -54,11 +50,9 @@ class Serial
     buff = FFI::MemoryPointer.new :char, 1
     count = FFI::MemoryPointer.new :uint32, 1
     err = RubySerial::Win32.ReadFile(@fd, buff, 1, count, nil)
-    if err == 0
-      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-    end
+    raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
 
-    if count.read_int == 0
+    if count.read_int.zero?
       nil
     else
       buff.get_bytes(0, 1).bytes.first
@@ -68,14 +62,13 @@ class Serial
   def write(data)
     buff = FFI::MemoryPointer.from_string(data.to_s)
     count = FFI::MemoryPointer.new :uint32, 1
-    err = RubySerial::Win32.WriteFile(@fd, buff, buff.size-1, count, nil)
-    if err == 0
-      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-    end
+    err = RubySerial::Win32.WriteFile(@fd, buff, buff.size - 1, count, nil)
+    raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
+
     count.read_int
   end
 
-  def gets(sep=$/, limit=nil)
+  def gets(sep = $INPUT_RECORD_SEPARATOR, limit = nil)
     if block_given?
       loop do
         yield(get_until_sep(sep, limit))
@@ -87,11 +80,9 @@ class Serial
 
   def close
     err = RubySerial::Win32.CloseHandle(@fd)
-    if err == 0
-      raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno]
-    else
-      @open = false
-    end
+    raise RubySerial::Error, RubySerial::Win32::ERROR_CODES[FFI.errno] if err.zero?
+
+    @open = false
   end
 
   def closed?
@@ -103,7 +94,10 @@ class Serial
   def get_until_sep(sep, limit)
     sep = "\n\n" if sep == ''
     # This allows the method signature to be (sep) or (limit)
-    (limit = sep; sep="\n") if sep.is_a? Integer
+    if sep.is_a? Integer
+      (limit = sep
+       sep = "\n")
+    end
     bytes = []
     loop do
       current_byte = getbyte
@@ -111,6 +105,6 @@ class Serial
       break if (bytes.last(sep.bytes.to_a.size) == sep.bytes.to_a) || ((bytes.size == limit) if limit)
     end
 
-    bytes.map { |e| e.chr }.join
+    bytes.map(&:chr).join
   end
 end
