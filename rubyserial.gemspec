@@ -19,5 +19,6 @@ Gem::Specification.new do |s|
   s.require_paths = ['lib']
 
   s.add_dependency 'ffi', '>= 1.9.3'
+  s.add_dependency 'activesupport', '>= 6.0'
   s.metadata['rubygems_mfa_required'] = 'true'
 end

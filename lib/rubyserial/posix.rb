@@ -3,6 +3,7 @@
 # Copyright (c) 2014-2016 The Hybrid Group
 
 require 'English'
+require 'active_support/core_ext/object/blank'
 class Serial
   def initialize(address, baude_rate = 9600, data_bits = 8, parity = :none, stop_bits = 1)
     file_opts = RubySerial::Posix::O_RDWR | RubySerial::Posix::O_NOCTTY | RubySerial::Posix::O_NONBLOCK
@@ -89,20 +90,70 @@ class Serial
     end
   end
 
+  # Optimized readline for protocol-based communication that expects multiple terminators
+  # This version avoids single-byte reads and uses chunked reading with progressive backoff
+  def readline_chunked(terminators: ["\n"], timeout: 5)
+    buffer = ''
+    start_time = Time.now
+    consecutive_empty_reads = 0
+    chunk_size = 256
+
+    terminators = Array(terminators) # Ensure it's an array
+
+    loop do
+      elapsed = Time.now - start_time
+      break if elapsed > timeout
+
+      chunk = read(chunk_size)
+
+      if chunk.present?
+        buffer += chunk
+        consecutive_empty_reads = 0
+
+        # Check if buffer ends with any of the terminators
+        terminator_found = terminators.any? { |term| buffer.end_with?(term) }
+
+        # Also check for common protocol responses
+        response_complete = buffer.include?('ERROR') || buffer.include?('OK')
+
+        break if terminator_found || response_complete
+
+      else
+        consecutive_empty_reads += 1
+
+        # Progressive backoff to avoid CPU spinning
+        if consecutive_empty_reads < 10
+          sleep(0.001)  # 1ms for first 10 attempts
+        elsif consecutive_empty_reads < 50
+          sleep(0.01)   # 10ms for next 40 attempts
+        else
+          sleep(0.05)   # 50ms after that
+        end
+
+        # If we have data and no new data is coming, break
+        break if !buffer.empty? && consecutive_empty_reads > 100
+      end
+    end
+
+    # Clean up common terminators
+    terminators.each { |term| buffer = buffer.chomp(term) }
+    buffer
+  end
+
   private
 
-  def get_until_sep(sep: nil, limit: nil)
+  def get_until_sep(sep: nil, limit: nil, timeout: 5)
     bytes = []
     loop do
       current_byte = getbyte
       bytes << current_byte unless current_byte.nil?
 
       # Calculate whether we've found the separator
-      separator_size      = sep.bytes.size
+      separator_size      = sep.bytesize
       separator_reached   = (bytes.last(separator_size) == sep.bytes)
 
-      # Check if we have a limit and it’s been reached
-      limit_reached       = limit && (bytes.size == limit)
+      # Check if we have a limit and it's been reached
+      limit_reached       = limit.present? && (bytes.size == limit)
 
       # Stop reading if either condition is true
       break if separator_reached || limit_reached

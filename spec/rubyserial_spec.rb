@@ -186,4 +186,73 @@ describe 'rubyserial' do
       expect(termios[:c_ispeed]).to eql(RubySerial::Posix::BAUDE_RATES[rate])
     end
   end
+
+  describe 'readline_chunked optimization' do
+    it 'should read with default newline terminator' do
+      @sp2.write("hello world\n")
+      sleep 0.1
+      result = @sp.readline_chunked
+      expect(result).to eql('hello world')
+    end
+
+    it 'should read with custom terminators' do
+      @sp2.write('data/')
+      sleep 0.1
+      result = @sp.readline_chunked(terminators: ['/'])
+      expect(result).to eql('data')  # Should strip the '/' terminator
+    end
+
+    it 'should detect ERROR responses' do
+      @sp2.write('some data ERROR more data')
+      sleep 0.1
+      result = @sp.readline_chunked
+      expect(result).to eql('some data ERROR more data')
+    end
+
+    it 'should detect OK responses' do
+      @sp2.write('command result OK trailing')
+      sleep 0.1
+      result = @sp.readline_chunked
+      expect(result).to eql('command result OK trailing')
+    end
+
+    it 'should handle multiple terminators' do
+      @sp2.write("test data\n")
+      sleep 0.1
+      result = @sp.readline_chunked(terminators: ["\n", "/"])
+      expect(result).to eql('test data')  # Should stop at newline and strip it
+    end
+
+    it 'should timeout appropriately' do
+      start_time = Time.now
+      result = @sp.readline_chunked(timeout: 1)
+      duration = Time.now - start_time
+      
+      expect(result).to eql('')
+      expect(duration).to be >= 1.0
+      expect(duration).to be < 1.5  # Should not take much longer than timeout
+    end
+
+    it 'should handle chunked data arrival' do
+      # Simulate data arriving in chunks
+      Thread.new do
+        sleep 0.05
+        @sp2.write('chunk1')
+        sleep 0.05
+        @sp2.write('chunk2')
+        sleep 0.05
+        @sp2.write("\n")
+      end
+      
+      result = @sp.readline_chunked(timeout: 2)
+      expect(result).to eql('chunk1chunk2')
+    end
+
+    it 'should work with protocol-style terminators like Texecom' do
+      @sp2.write("\\RESPONSE/")
+      sleep 0.1
+      result = @sp.readline_chunked(terminators: ["/"])
+      expect(result).to eql("\\RESPONSE")
+    end
+  end
 end
