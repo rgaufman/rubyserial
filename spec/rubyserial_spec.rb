@@ -14,7 +14,7 @@ describe 'rubyserial' do
     else
       File.delete('socat.log') if File.file?('socat.log')
 
-      raise 'socat not found' unless `socat -h` && $CHILD_STATUS == 0
+      raise 'socat not found' unless $CHILD_STATUS == 0
 
       Thread.new do
         system('socat -lf socat.log -d -d pty,raw,echo=0 pty,raw,echo=0')
@@ -199,7 +199,7 @@ describe 'rubyserial' do
       @sp2.write('data/')
       sleep 0.1
       result = @sp.readline_chunked(terminators: ['/'])
-      expect(result).to eql('data')  # Should strip the '/' terminator
+      expect(result).to eql('data') # Should strip the '/' terminator
     end
 
     it 'should detect ERROR responses' do
@@ -219,18 +219,18 @@ describe 'rubyserial' do
     it 'should handle multiple terminators' do
       @sp2.write("test data\n")
       sleep 0.1
-      result = @sp.readline_chunked(terminators: ["\n", "/"])
-      expect(result).to eql('test data')  # Should stop at newline and strip it
+      result = @sp.readline_chunked(terminators: ["\n", '/'])
+      expect(result).to eql('test data') # Should stop at newline and strip it
     end
 
     it 'should timeout appropriately' do
       start_time = Time.now
       result = @sp.readline_chunked(timeout: 1)
       duration = Time.now - start_time
-      
+
       expect(result).to eql('')
       expect(duration).to be >= 1.0
-      expect(duration).to be < 1.5  # Should not take much longer than timeout
+      expect(duration).to be < 1.5 # Should not take much longer than timeout
     end
 
     it 'should handle chunked data arrival' do
@@ -243,16 +243,16 @@ describe 'rubyserial' do
         sleep 0.05
         @sp2.write("\n")
       end
-      
+
       result = @sp.readline_chunked(timeout: 2)
       expect(result).to eql('chunk1chunk2')
     end
 
     it 'should work with protocol-style terminators like Texecom' do
-      @sp2.write("\\RESPONSE/")
+      @sp2.write('\\RESPONSE/')
       sleep 0.1
-      result = @sp.readline_chunked(terminators: ["/"])
-      expect(result).to eql("\\RESPONSE")
+      result = @sp.readline_chunked(terminators: ['/'])
+      expect(result).to eql('\\RESPONSE')
     end
   end
 end

@@ -5,6 +5,7 @@
 module RubySerial
   module Win32
     extend FFI::Library
+
     ffi_lib 'kernel32'
     ffi_convention :stdcall
 

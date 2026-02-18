@@ -5,6 +5,7 @@
 module RubySerial
   module Posix
     extend FFI::Library
+
     ffi_lib FFI::Library::LIBC
 
     O_RDWR = 0x0002
